@@ -427,13 +427,24 @@ def install_menu_entry() -> None:
 
 
 class ShareRow:
-    def __init__(self, spec: dict):
+    def __init__(self, spec: dict, custom: bool = False):
         self.spec = spec
+        self.custom = custom
         self.enabled = QCheckBox(spec["name"])
-        self.enabled.setChecked(True)
-        self.enabled.setToolTip(spec["kind"])
-        self.kind = QLabel(spec["kind"])
-        self.kind.setStyleSheet("color: palette(mid);")
+        self.enabled.setChecked(not custom)
+        self.enabled.setToolTip(
+            "Fill this in to mount a share that is not one of the presets."
+            if custom
+            else spec["kind"]
+        )
+        if custom:
+            self.name_edit = QLineEdit()
+            self.name_edit.setPlaceholderText("Name")
+            self.kind = self.name_edit
+        else:
+            self.name_edit = None
+            self.kind = QLabel(spec["kind"])
+            self.kind.setStyleSheet("color: palette(mid);")
         self.source = QLineEdit(spec["source"])
         self.mount = QLineEdit(spec["mount"])
         self.source.setPlaceholderText("//server/Share")
@@ -442,17 +453,27 @@ class ShareRow:
     def value(self) -> dict | None:
         if not self.enabled.isChecked():
             return None
+        if self.custom:
+            name = self.name_edit.text().strip() if self.name_edit else ""
+            if not name:
+                raise ValueError("Custom share needs a name.")
+            if "/" in name or name in {".", ".."}:
+                raise ValueError("Custom share name cannot contain /.")
+            kind = "Custom"
+        else:
+            name = self.spec["name"]
+            kind = self.spec["kind"]
         source = self.source.text().strip()
         mount = self.mount.text().strip()
         if not source.startswith("//") or "/" not in source[2:]:
-            raise ValueError(f"{self.spec['name']}: share must look like //host/Share")
+            raise ValueError(f"{name}: share must look like //host/Share")
         if not mount.startswith("/"):
-            raise ValueError(f"{self.spec['name']}: mount point must be an absolute path")
+            raise ValueError(f"{name}: mount point must be an absolute path")
         return {
-            "name": self.spec["name"],
+            "name": name,
             "source": source,
             "mount": mount,
-            "kind": self.spec["kind"],
+            "kind": kind,
         }
 
 
@@ -501,6 +522,12 @@ class MainWindow(QMainWindow):
             label.setStyleSheet("font-weight: 600;")
             grid.addWidget(label, 0, col)
         self.rows = [ShareRow(spec) for spec in DEFAULT_SHARES]
+        self.rows.append(
+            ShareRow(
+                {"name": "Custom", "source": "", "mount": "", "kind": "Custom"},
+                custom=True,
+            )
+        )
         for row_i, row in enumerate(self.rows, start=1):
             grid.addWidget(row.enabled, row_i, 0)
             grid.addWidget(row.kind, row_i, 1)
@@ -565,8 +592,11 @@ class MainWindow(QMainWindow):
             if value:
                 shares.append(value)
         mounts = [s["mount"] for s in shares]
+        names = [s["name"] for s in shares]
         if len(mounts) != len(set(mounts)):
             raise ValueError("Two shares use the same mount point.")
+        if len(names) != len(set(names)):
+            raise ValueError("Two shares use the same name.")
         return shares
 
     def append_log(self, text: str) -> None:
