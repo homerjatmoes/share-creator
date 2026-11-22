@@ -8,7 +8,7 @@ Python GUI for CachyOS / KDE Plasma that sets up the SMB network shares:
 | Kwik-E-Mart | `/mnt/Kwik-E-Mart` | `//192.168.2.52/Main` (Unraid) |
 | Moes-Tavern | `/mnt/Moes-Tavern` | `//192.168.2.51/DrivePool` (Windows 11) |
 
-Each share has a checkbox. Apply will:
+Each preset share has a checkbox. A **Custom** row at the bottom is unchecked until you fill in a name, `//host/Share`, and mount point. Apply will:
 
 1. Ask for your sudo password (used once, not saved).
 2. Write `~/.smbcredentials` as mode `600`.
